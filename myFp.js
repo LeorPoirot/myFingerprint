@@ -37,7 +37,8 @@
         detectScreenOrientation: true,
         sortPluginsFor: [/palemoon/i],
         userDefinedFonts: [],
-        excludeDoNotTrack: true
+        excludeDoNotTrack: true,
+        excludeJsFonts:true
       }
     }
 
@@ -113,6 +114,7 @@
       keys = this.touchSupportKey(keys) // √
       keys = this.gpuRendererkey(keys) // crossArg
       keys = this.screenDPIKey(keys) //crossArg
+      keys = this.audioArgKey(keys) //crossArg
       keys = this.customEntropyFunction(keys)
       this.languageListKey(keys)  //crossArg
       this.fontsKey(keys, function (newKeys) {
@@ -128,7 +130,7 @@
         return done(murmur, newKeys.data)
       })
     },
-
+    
     languageListKey: function (keys) {
         if (!this.options.excludeLanguage) { 
 
@@ -261,7 +263,26 @@
           setTimeout(getLg(this),1)
       }       
     },
-
+    audioArgKey:function (keys){
+      if(!this.options.excludeaudioArg){
+        keys.addPreprocessedComponent({key:"audio", value: this.getAudioArg()})
+      }
+      return keys
+    },
+    getAudioArg:function(){
+      try{
+         var audioCtx = new (window.AudioContext||window.webkitAudioContext),
+             oscillator = audioCtx.createOscillator(),
+             analyser = audioCtx.createAnalyser(),
+             gainNode = audioCtx.createGain(),
+             scriptProcessor = audioCtx.createScriptProcessor(4096, 1, 1)
+         var destination = audioCtx.destination
+         return (audioCtx.sampleRate).toString() + '_' + destination.maxChannelCount + "_" + destination.numberOfInputs + '_' + destination.numberOfOutputs + '_' + destination.channelCount + '_' + destination.channelCountMode + '_' + destination.channelInterpretation
+      }
+      catch (e) {
+            return "not supported"
+        }
+    },
     customEntropyFunction: function (keys) {
       if (typeof this.options.customFunction === 'function') {
         keys.addPreprocessedComponent({key: 'custom', value: this.options.customFunction()})
@@ -531,7 +552,7 @@
       }
       return keys
     },
-    fontsKey: function (keys, done) { //flashFonts 和jsFont有什么区别
+    fontsKey: function (keys, done) { 
       if (this.options.excludeJsFonts) {
         return this.flashFontsKey(keys, done)
       }
