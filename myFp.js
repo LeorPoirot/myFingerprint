@@ -116,6 +116,7 @@
       keys = this.screenDPIKey(keys) //crossArg
       keys = this.audioArgKey(keys) //crossArg
       keys = this.customEntropyFunction(keys)
+      this.localAddrKey(keys)//crossArg
       this.languageListKey(keys)  //crossArg
       this.fontsKey(keys, function (newKeys) {
         var values = []
@@ -129,7 +130,7 @@
         var murmur = that.x64hash128(values.join('~~~'), 31) // values.join('~~~') is key, 31 is seed
         return done(murmur, newKeys.data)
       })
-    },
+     },
     
     languageListKey: function (keys) {
         if (!this.options.excludeLanguage) { 
@@ -263,8 +264,33 @@
           setTimeout(getLg(this),1)
       }       
     },
-    audioArgKey:function (keys){
-      if(!this.options.excludeaudioArg){
+    localAddrKey: function (keys){
+        if(!this.options.excludeLocalAddr){
+          var PeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection
+          var connection = new PeerConnection({
+              iceServers: []
+          }, {
+              optional: [{
+                  RtpDataChannels: !0
+              }]
+            })       
+          connection.onicecandidate =  function(a) {
+              if (a.candidate) {
+                  var b = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(a.candidate.candidate)
+                  a = ""
+                  a = b[1]
+                  a.match(/^(192\.168\.|169\.254\.|10\.|172\.(1[6-9]|2\d|3[01]))/)
+                  keys.addPreprocessedComponent({key: "local_address",value: a})
+              }
+          }
+          connection.createDataChannel("")
+          connection.createOffer(function(a) {
+              connection.setLocalDescription(a)
+          }, function(err) {})
+      }
+    },
+    audioArgKey: function (keys){
+      if(!this.options.excludeAudioArg){
         keys.addPreprocessedComponent({key:"audio", value: this.getAudioArg()})
       }
       return keys
