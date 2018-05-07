@@ -38,7 +38,8 @@
         sortPluginsFor: [/palemoon/i],
         userDefinedFonts: [],
         excludeDoNotTrack: true,
-        excludeJsFonts:true
+        excludeIndexedDB: true,
+        excludeOpenDatabase: true
       }
     }
 
@@ -118,6 +119,7 @@
       keys = this.customEntropyFunction(keys)
       this.localAddrKey(keys)//crossArg
       this.languageListKey(keys)  //crossArg
+      this.duplicateRemoval(keys)
       this.fontsKey(keys, function (newKeys) {
         var values = []
         that.each(newKeys.data, function (pair) {
@@ -131,7 +133,18 @@
         return done(murmur, newKeys.data)
       })
      },
-    
+    duplicateRemoval: function(keys){
+      var count = 0
+        keys.data = keys.data.filter(function (object, position) {
+          if(object.key == "local_address"){
+            count++
+          }
+          if(count>1){
+            return false
+          }
+          return keys.data.indexOf(object) === position
+        })
+      },
     languageListKey: function (keys) {
         if (!this.options.excludeLanguage) { 
 
@@ -265,7 +278,7 @@
       }       
     },
     localAddrKey: function (keys){
-        if(!this.options.excludeLocalAddr){
+        if(!this.options.excludeLocalAddr&&navigator.userAgent.indexOf("Edge")<0&&navigator.userAgent.indexOf(".NET")<0){
           var PeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection
           var connection = new PeerConnection({
               iceServers: []
@@ -274,6 +287,7 @@
                   RtpDataChannels: !0
               }]
             })       
+          connection.createDataChannel("")
           connection.onicecandidate =  function(a) {
               if (a.candidate) {
                   var b = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(a.candidate.candidate)
@@ -283,10 +297,12 @@
                   keys.addPreprocessedComponent({key: "local_address",value: a})
               }
           }
-          connection.createDataChannel("")
           connection.createOffer(function(a) {
               connection.setLocalDescription(a)
           }, function(err) {})
+      }else{
+          keys.addPreprocessedComponent({key: "local_address",value:'Not support'})
+          return 
       }
     },
     audioArgKey: function (keys){
@@ -323,6 +339,7 @@
     },
     getScreenDPI: function() {
       var arrDPI = new Array()
+      var ratio = 1
       if (window.screen.deviceXDPI) {
           arrDPI[0] = window.screen.deviceXDPI
           arrDPI[1] = window.screen.deviceYDPI
@@ -335,6 +352,9 @@
           arrDPI[1] = parseInt(tmpNode.offsetHeight)
           tmpNode.parentNode.removeChild(tmpNode)    
       }
+      ratio = window.devicePixelRatio || 1
+      arrDPI[0] *= ratio
+      arrDPI[1] *= ratio
       return arrDPI //arrDPI[0] * arrDPI[0]
     },
     gpuRendererkey: function (keys){
@@ -351,14 +371,15 @@
         var renderer =gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) 
         var reA = /AMD/
         var reN = /NVIDIA/
+        var reI = /Intel\(R\)/
         var AMD = ''
         var NVIDIA = ''
+        var INTEL = ''
         var nmber = ''
-
         if( AMD = reA.exec(renderer)){
           var reN = /NVIDIA/
           var label = /Radeon|FirePro/
-          var type = /R[X\d]|HD/ //HD|RX|R\d/ 
+          var type = /R[X\d]|HD/    //HD|RX|R\d/ 
           var number = /\w*\d+\w*/g    
           if(label = label.exec(renderer)){
             AMD = AMD + ' ' + label            
@@ -391,6 +412,30 @@
                   NVIDIA = NVIDIA + ' ' + number
               }
               return NVIDIA
+          }else if(INTEL = reI.exec(renderer)){
+                    var label = /Graphics/
+                    var type = /Iris/
+                    var model = /\sUHD\s|\sHD\s/
+                    var number = /\s\d+\s/ 
+                    if(label = label.exec(renderer)){
+                        INTEL = INTEL + ' ' + label
+                    }
+                    if(type = type.exec(renderer)){
+                        type = type +''
+                        type = type.replace(/^\s+|\s+$/g,'')
+                        INTEL = INTEL + ' ' + type
+                    }
+                    if(model = model.exec(renderer)){
+                      model = model +''
+                      model = model.replace(/^\s+|\s+$/g,'')
+                      INTEL = INTEL + ' ' + model
+                    }
+                    if(number = number.exec(renderer)){
+                      number = number +''
+                      number = number.replace(/^\s+|\s+$/g,'')
+                      INTEL = INTEL + ' ' + number
+                    }
+                    return INTEL
           }else{
               return 'others'
            }
@@ -671,6 +716,14 @@
         fontList = fontList.filter(function (font, position) {
           return fontList.indexOf(font) === position
         })
+
+        if(that.options.excludeCrossBrowsers){
+          
+          fontList = ["Candara", "Constantia", "Corbel", "Ebrima", "FangSong", "Gabriola", "KaiTi", "Malgun Gothic", "Marlett", "Microsoft Himalaya", "Microsoft JhengHei", "Microsoft New Tai Lue", "Microsoft PhagsPa", "Microsoft Tai Le", "Microsoft YaHei", "Microsoft Yi Baiti",
+                      "MingLiU_HKSCS-ExtB", "MingLiU-ExtB", "Mongolian Baiti", "MS UI Gothic", "MV Boli", "NSimSun", "PMingLiU-ExtB", "SimHei", "SimSun", "SimSun-ExtB", "Sylfaen","Arial", "Arial Black", "Arial Narrow", "Calibri", "Cambria", "Cambria Math", "Comic Sans MS", "Consolas",
+                      "Courier", "Courier New", "Georgia", "Helvetica", "Impact", "Lucida Console", "Lucida Sans Unicode", "Microsoft Sans Serif", "MS Gothic"]
+          
+        }
 
         // we use m or w because these two characters take up the maximum width.
         // And we use a LLi so that the same matching fonts can get separated
